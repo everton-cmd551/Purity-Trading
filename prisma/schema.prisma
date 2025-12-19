@@ -38,15 +38,16 @@ model Commodity {
 
 // Core Deal
 model Deal {
-  id String @id // Deal Note Number (Manual Entry)
+  id String @id // Deal Note Number (e.g. RP-0008)
 
-  date DateTime @default(now())
+  date DateTime // Deal Date
 
-  status String @default("Open") // Open, Closed
+  status String @default("Open") // Open, Closed, Cancelled
 
   // Relations
   commodityId String
   commodity   Commodity @relation(fields: [commodityId], references: [id])
+  commodityGrade String? // Commodity Notes / Grade
 
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id])
@@ -54,25 +55,29 @@ model Deal {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id])
 
-  financierId String
-  financier   Financier @relation(fields: [financierId], references: [id])
+  financierId String? // Nullable for self-funded
+  financier   Financier? @relation(fields: [financierId], references: [id])
 
-  // Economics
-  quantity          Float // Tons
+  // Quantity & Pricing (Inputs)
+  quantity          Decimal // Transaction Tonnage (Agreed)
   supplierPricePerTon Decimal
   offtakePricePerTon  Decimal
   
-  // Computed/Stored
+  // Commercial Value Calculations (Stored for performance/sorting)
   costValue        Decimal // quantity * supplierPrice
   expectedSalesValue Decimal // quantity * offtakePrice
+  expectedGrossMargin Decimal // sales - cost
+  expectedMarginPercentage Decimal // gross / sales
   
+  // Terms & Control
+  paymentTermsCustomer Int? // Days
+  paymentTermsFinancier Int? // Days
+  dealOwner String? // User name/ID
+  comments String?
+
   // Modules
-  loan             Loan? // One loan per deal for now
+  loan             Loan? // One loan per deal
   deliveries       Delivery[]
-  
-  // Inventory field to track calculated stock if needed, or query it.
-  // Prompt says "Inventory Management... Outstanding Stock".
-  // We can calculate this: quantity - sum(deliveries.quantity)
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
