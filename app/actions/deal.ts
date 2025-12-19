@@ -27,6 +27,11 @@ export type CreateDealInput = {
     paymentTermsFinancier?: number;
     dealOwner?: string;
     comments?: string;
+
+    // Loan / Financing (New fields from Excel)
+    disbursementDate?: Date;
+    loanInterestRate?: number; // Optional, to calculate repayment if needed, or just manual input
+    maturityValue?: number; // Manual input or calculated
 };
 
 export async function createDeal(input: CreateDealInput) {
@@ -37,32 +42,56 @@ export async function createDeal(input: CreateDealInput) {
         const expectedGrossMargin = expectedSalesValue - costValue;
         const expectedMarginPercentage = expectedSalesValue > 0 ? (expectedGrossMargin / expectedSalesValue) * 100 : 0;
 
-        const deal = await prisma.deal.create({
-            data: {
-                id: input.id,
-                date: input.date,
-                status: input.status,
-                commodityId: input.commodityId,
-                commodityGrade: input.commodityGrade,
-                supplierId: input.supplierId,
-                customerId: input.customerId,
-                financierId: input.financierId || undefined,
-                quantity: input.quantity,
-                supplierPricePerTon: input.supplierPricePerTon,
-                offtakePricePerTon: input.offtakePricePerTon,
-                costValue,
-                expectedSalesValue,
-                expectedGrossMargin,
-                expectedMarginPercentage,
-                paymentTermsCustomer: input.paymentTermsCustomer,
-                paymentTermsFinancier: input.paymentTermsFinancier,
-                dealOwner: input.dealOwner,
-                comments: input.comments,
-            },
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Create Deal
+            const deal = await tx.deal.create({
+                data: {
+                    id: input.id,
+                    date: input.date,
+                    status: input.status,
+                    commodityId: input.commodityId,
+                    commodityGrade: input.commodityGrade,
+                    supplierId: input.supplierId,
+                    customerId: input.customerId,
+                    financierId: input.financierId || undefined,
+                    quantity: input.quantity,
+                    supplierPricePerTon: input.supplierPricePerTon,
+                    offtakePricePerTon: input.offtakePricePerTon,
+                    costValue,
+                    expectedSalesValue,
+                    expectedGrossMargin,
+                    expectedMarginPercentage,
+                    paymentTermsCustomer: input.paymentTermsCustomer,
+                    paymentTermsFinancier: input.paymentTermsFinancier,
+                    dealOwner: input.dealOwner,
+                    comments: input.comments,
+                },
+            });
+
+            // 2. Create Loan if Financier and details are present
+            if (input.financierId && input.disbursementDate && input.paymentTermsFinancier) {
+                // Calculate maturity date if not passed (though we might want to pass it explicitly to be safe, logic: disbursement + days)
+                const maturityDate = new Date(input.disbursementDate);
+                maturityDate.setDate(maturityDate.getDate() + input.paymentTermsFinancier);
+
+                await tx.loan.create({
+                    data: {
+                        dealId: deal.id,
+                        principal: costValue, // Assuming loan covers the cost
+                        disbursementDate: input.disbursementDate,
+                        paymentTerms: input.paymentTermsFinancier,
+                        maturityDate: maturityDate,
+                        repaymentAmount: input.maturityValue || costValue, // Default to principal if no interest/value provided
+                        status: "Open"
+                    }
+                });
+            }
+
+            return deal;
         });
 
         revalidatePath("/deals");
-        return { success: true, deal };
+        return { success: true, deal: result };
     } catch (error: any) {
         if (error.code === 'P2002') {
             return { success: false, error: "Deal Note Number must be unique." };
@@ -79,7 +108,8 @@ export async function getDeals() {
             commodity: true,
             supplier: true,
             customer: true,
-            financier: true
+            financier: true,
+            loan: true
         }
     });
 }

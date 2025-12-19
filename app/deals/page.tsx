@@ -45,42 +45,53 @@ export default async function DealRegisterPage() {
                                     <TableRow>
                                         <TableHead>Deal Note</TableHead>
                                         <TableHead>Date</TableHead>
-                                        <TableHead>Customer</TableHead>
-                                        <TableHead>Supplier</TableHead>
                                         <TableHead>Commodity</TableHead>
+                                        <TableHead>Supplier</TableHead>
+                                        <TableHead>Customer</TableHead>
+                                        <TableHead>Financier</TableHead>
                                         <TableHead className="text-right">Tonnage</TableHead>
-                                        <TableHead className="text-right">Margin %</TableHead>
+                                        <TableHead className="text-right">Deal Value ($)</TableHead>
+                                        <TableHead className="text-right">Sales Value ($)</TableHead>
+                                        <TableHead>Disburs. Date</TableHead>
+                                        <TableHead>Maturity</TableHead>
                                         <TableHead>Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {deals.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                                                No deals creation yet. Correct.
+                                            <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                                                No deals found. Create a new deal note to get started.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        deals.map((deal) => (
-                                            <TableRow key={deal.id}>
-                                                <TableCell className="font-medium">{deal.id}</TableCell>
-                                                <TableCell>{format(deal.date, "MMM d, yyyy")}</TableCell>
-                                                <TableCell>{deal.customer.name}</TableCell>
-                                                <TableCell>{deal.supplier.name}</TableCell>
-                                                <TableCell>{deal.commodity.name}</TableCell>
-                                                <TableCell className="text-right">{Number(deal.quantity).toFixed(2)}</TableCell>
-                                                <TableCell className="text-right">
-                                                    <span className={Number(deal.expectedMarginPercentage) < 0 ? "text-destructive font-medium" : "text-green-600 font-medium"}>
-                                                        {Number(deal.expectedMarginPercentage).toFixed(2)}%
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant={deal.status === 'Open' ? 'default' : 'secondary'}>
-                                                        {deal.status}
-                                                    </Badge>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
+                                        deals.map((deal) => {
+                                            const loan = deal.loan;
+                                            return (
+                                                <TableRow key={deal.id}>
+                                                    <TableCell className="font-medium">{deal.id}</TableCell>
+                                                    <TableCell>{format(deal.date || new Date(), "MMM d, yyyy")}</TableCell>
+                                                    <TableCell>{deal.commodity?.name}</TableCell>
+                                                    <TableCell>{deal.supplier?.name}</TableCell>
+                                                    <TableCell>{deal.customer?.name}</TableCell>
+                                                    <TableCell>{deal.financier?.name || '-'}</TableCell>
+                                                    <TableCell className="text-right">{Number(deal.quantity).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                                    <TableCell className="text-right">{Number(deal.costValue).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                                    <TableCell className="text-right">{Number(deal.expectedSalesValue).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                                    <TableCell>
+                                                        {loan?.disbursementDate ? format(loan.disbursementDate, "MMM d, yyyy") : '-'}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {loan?.maturityDate ? format(loan.maturityDate, "MMM d, yyyy") : '-'}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={deal.status === 'Open' ? 'default' : 'secondary'}>
+                                                            {deal.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
                                     )}
                                 </TableBody>
                             </Table>
