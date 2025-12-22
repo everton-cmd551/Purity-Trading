@@ -1,79 +1,74 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { getCustomerPayments, getOpenInvoices, createCustomerPayment } from "@/app/actions/customer-payments";
+import { useState, useEffect } from "react";
+import { getCustomerPayments, getOpenInvoices, deleteCustomerPayment } from "@/app/actions/customer-payments";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Plus, RotateCcw } from "lucide-react";
+import { Plus, MoreHorizontal, Trash, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { PaymentDialog } from "@/components/receivables/PaymentDialog";
 
 export default function CustomerPaymentsPage() {
     const [payments, setPayments] = useState<any[]>([]);
     const [invoices, setInvoices] = useState<any[]>([]);
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+    // Edit State
+    const [editingPayment, setEditingPayment] = useState<any>(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
     const router = useRouter();
-
-    // Form State
-    const [selectedDeliveryId, setSelectedDeliveryId] = useState("");
-    const [amount, setAmount] = useState("");
-    const [method, setMethod] = useState("CASH");
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-
-    // Derived Form State
-    const selectedInvoice = useMemo(() =>
-        invoices.find(inv => inv.id === selectedDeliveryId),
-        [selectedDeliveryId, invoices]);
 
     useEffect(() => {
         loadData();
     }, []);
 
     async function loadData() {
-        const [paymentsData, invoicesData] = await Promise.all([
-            getCustomerPayments(),
-            getOpenInvoices()
-        ]);
-        setPayments(paymentsData);
-        setInvoices(invoicesData);
+        try {
+            const [paymentsData, invoicesData] = await Promise.all([
+                getCustomerPayments(),
+                getOpenInvoices()
+            ]);
+            setPayments(paymentsData || []);
+            setInvoices(invoicesData || []);
+        } catch (error) {
+            console.error("Failed to load payment data:", error);
+            toast.error("Failed to load data. Please refresh.");
+        }
     }
 
-    async function handleSubmit() {
-        if (!selectedDeliveryId || !amount || parseFloat(amount) <= 0) {
-            toast.error("Please fill in all required fields correctly.");
-            return;
-        }
+    const handleCreate = () => {
+        setIsCreateDialogOpen(true);
+    };
 
-        if (selectedInvoice && parseFloat(amount) > selectedInvoice.outstandingAmount + 0.01) {
-            toast.warning("Note: Payment exceeds outstanding balance.");
-            // Non-blocking warning
-        }
+    const handleEdit = (payment: any) => {
+        setEditingPayment(payment);
+        setIsEditDialogOpen(true);
+    };
 
-        const result = await createCustomerPayment({
-            deliveryId: selectedDeliveryId,
-            date: new Date(date),
-            amount: parseFloat(amount),
-            method: method
-        });
-
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this payment?")) return;
+        toast.info("Deleting payment...");
+        const result = await deleteCustomerPayment(id);
         if (result.success) {
-            toast.success("Payment recorded successfully.");
-            setIsDialogOpen(false);
-            setAmount("");
-            setSelectedDeliveryId("");
+            toast.success("Payment deleted successfully");
             loadData();
             router.refresh();
         } else {
-            toast.error("Failed to record payment.");
+            toast.error("Failed to delete payment");
         }
-    }
+    };
 
     return (
         <div className="space-y-6">
@@ -82,71 +77,23 @@ export default function CustomerPaymentsPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Customer Payments Sheet</h1>
                     <p className="text-muted-foreground">Authoritative ledger for all customer receipts.</p>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button><Plus className="mr-2 h-4 w-4" /> Record New Payment</Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-xl">
-                        <DialogHeader>
-                            <DialogTitle>Record Customer Receipt</DialogTitle>
-                            <DialogDescription>
-                                This will record a consolidated receipt against a specific invoice.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Invoice / Deal</Label>
-                                <Select value={selectedDeliveryId} onValueChange={setSelectedDeliveryId}>
-                                    <SelectTrigger className="col-span-3">
-                                        <SelectValue placeholder="Select Invoice to Pay" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {invoices.map((inv) => (
-                                            <SelectItem key={inv.id} value={inv.id}>
-                                                {inv.invoiceNumber} | {inv.dealId} | {inv.customerName} (Outst: ${inv.outstandingAmount.toLocaleString()})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {selectedInvoice && (
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Customer</Label>
-                                    <div className="col-span-3 p-2 bg-muted rounded-md text-sm font-medium">
-                                        {selectedInvoice.customerName}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Date Received</Label>
-                                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="col-span-3" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Method</Label>
-                                <Select value={method} onValueChange={setMethod}>
-                                    <SelectTrigger className="col-span-3">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="CASH">CASH</SelectItem>
-                                        <SelectItem value="NOSTRO">NOSTRO</SelectItem>
-                                        <SelectItem value="NOSTRO / BANK">NOSTRO / BANK</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Amount ($)</Label>
-                                <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="col-span-3" placeholder="0.00" />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button onClick={handleSubmit}>Save Receipt</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" /> Record New Payment</Button>
             </div>
+
+            <PaymentDialog
+                open={isCreateDialogOpen}
+                onOpenChange={setIsCreateDialogOpen}
+                invoices={invoices}
+                onSuccess={loadData}
+            />
+
+            <PaymentDialog
+                open={isEditDialogOpen}
+                onOpenChange={setIsEditDialogOpen}
+                invoices={[]} // Not needed for edit
+                initialData={editingPayment}
+                onSuccess={loadData}
+            />
 
             <Card>
                 <CardHeader>
@@ -166,12 +113,13 @@ export default function CustomerPaymentsPage() {
                                 <TableHead>Commodity</TableHead>
                                 <TableHead>Method</TableHead>
                                 <TableHead className="text-right">Amount ($)</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {payments.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                                         No payments recorded yet.
                                     </TableCell>
                                 </TableRow>
@@ -194,6 +142,29 @@ export default function CustomerPaymentsPage() {
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-bold text-green-600">
                                             {p.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </TableCell>
+                                        <TableCell>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleEdit(p)}
+                                                    >
+                                                        <Edit className="mr-2 h-4 w-4" /> Edit
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        className="text-destructive focus:text-destructive"
+                                                        onClick={() => handleDelete(p.id)}
+                                                    >
+                                                        <Trash className="mr-2 h-4 w-4" /> Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))

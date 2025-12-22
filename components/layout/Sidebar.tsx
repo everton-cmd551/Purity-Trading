@@ -19,7 +19,6 @@ const navItems = [
     { name: "Deal Register", href: "/deals", icon: FileText },
     { name: "Financing", href: "/financing", icon: Banknote },
     { name: "Repayments", href: "/repayments", icon: Banknote },
-    { name: "Inventory", href: "/inventory", icon: Package },
     { name: "Cust. Deliveries", href: "/receivables", icon: Users },
     { name: "Cust. Payments", href: "/customer-payments", icon: Wallet },
     { name: "Cash Book", href: "/treasury", icon: Wallet },

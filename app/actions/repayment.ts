@@ -3,7 +3,7 @@
 import { PrismaClient } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
-const prisma = new PrismaClient();
+import { db as prisma } from "@/lib/db";
 
 export type CreateRepaymentInput = {
     loanId: string; // The ID of the Loan (linked to Deal)
@@ -110,7 +110,8 @@ export async function getOpenLoans() {
         include: {
             deal: {
                 include: { financier: true }
-            }
+            },
+            repayments: true
         }
     });
 
@@ -120,6 +121,41 @@ export async function getOpenLoans() {
         id: l.id, // Loan ID
         dealId: l.deal.id, // Deal Note Label
         financierName: l.deal.financier?.name || 'Unknown',
-        outstandingAmount: Number(l.repaymentAmount) - l.repayments.reduce((s, r) => s + Number(r.amount), 0) // Roughly
+        outstandingAmount: Number(l.repaymentAmount) - l.repayments.reduce((s: number, r: any) => s + Number(r.amount), 0) // Roughly
     }));
+}
+
+export async function deleteRepayment(id: string) {
+    try {
+        await prisma.repayment.delete({ where: { id } });
+
+        revalidatePath("/repayments");
+        revalidatePath("/financing");
+        revalidatePath("/treasury");
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to delete repayment:", error);
+        return { success: false, error: error.message || "Failed to delete repayment" };
+    }
+}
+
+export async function updateRepayment(id: string, data: { date: Date; amount: number; method: string }) {
+    try {
+        await prisma.repayment.update({
+            where: { id },
+            data: {
+                date: data.date,
+                amount: data.amount,
+                method: data.method
+            }
+        });
+
+        revalidatePath("/repayments");
+        revalidatePath("/financing");
+        revalidatePath("/treasury");
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to update repayment:", error);
+        return { success: false, error: error.message || "Failed to update repayment" };
+    }
 }

@@ -1,31 +1,36 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { getRepaymentData, getOpenLoans, createRepayment } from "@/app/actions/repayment";
+import { getRepaymentData, getOpenLoans, deleteRepayment } from "@/app/actions/repayment";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Plus, Filter, RotateCcw } from "lucide-react";
+import { Plus, RotateCcw, MoreHorizontal, Trash, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { RepaymentDialog } from "@/components/repayments/RepaymentDialog";
 
 export default function RepaymentsPage() {
     const [repayments, setRepayments] = useState<any[]>([]);
     const [loans, setLoans] = useState<any[]>([]);
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const router = useRouter();
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-    // Form State
-    const [selectedLoanId, setSelectedLoanId] = useState("");
-    const [amount, setAmount] = useState("");
-    const [method, setMethod] = useState("CASH");
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    // Edit State
+    const [editingRepayment, setEditingRepayment] = useState<any>(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+    const router = useRouter();
 
     // Filter State
     const [filterDealId, setFilterDealId] = useState("");
@@ -47,30 +52,27 @@ export default function RepaymentsPage() {
         setLoans(loanData);
     }
 
-    async function handleSubmit() {
-        if (!selectedLoanId || !amount || parseFloat(amount) <= 0) {
-            toast.error("Please fill in all required fields correctly.");
-            return;
-        }
+    const handleCreate = () => {
+        setIsCreateDialogOpen(true);
+    };
 
-        const result = await createRepayment({
-            loanId: selectedLoanId,
-            date: new Date(date),
-            amount: parseFloat(amount),
-            method: method
-        });
+    const handleEdit = (repayment: any) => {
+        setEditingRepayment(repayment);
+        setIsEditDialogOpen(true);
+    };
 
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this repayment?")) return;
+        toast.info("Deleting repayment...");
+        const result = await deleteRepayment(id);
         if (result.success) {
-            toast.success("Repayment recorded and Cash Book updated.");
-            setIsDialogOpen(false);
-            setAmount("");
-            setSelectedLoanId("");
-            loadData(); // Refresh table
+            toast.success("Repayment deleted successfully");
+            loadData();
             router.refresh();
         } else {
-            toast.error("Failed to record repayment.");
+            toast.error("Failed to delete repayment");
         }
-    }
+    };
 
     // Derived Data
     const uniqueFinanciers = useMemo(() => {
@@ -119,61 +121,26 @@ export default function RepaymentsPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Repayment Ledger</h1>
                     <p className="text-muted-foreground">Manage and track loan repayments to financiers.</p>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button><Plus className="mr-2 h-4 w-4" /> Record Repayment</Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Record New Repayment</DialogTitle>
-                            <DialogDescription>
-                                This will add a repayment record and update the Cash Book automatically.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Deal Note</Label>
-                                <Select value={selectedLoanId} onValueChange={setSelectedLoanId}>
-                                    <SelectTrigger className="col-span-3">
-                                        <SelectValue placeholder="Select Deal Note" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {loans.map((loan) => (
-                                            <SelectItem key={loan.id} value={loan.id}>
-                                                {loan.dealId} - {loan.financierName}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Date</Label>
-                                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="col-span-3" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Method</Label>
-                                <Select value={method} onValueChange={setMethod}>
-                                    <SelectTrigger className="col-span-3">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="CASH">CASH</SelectItem>
-                                        <SelectItem value="NOSTRO">NOSTRO</SelectItem>
-                                        <SelectItem value="NOSTRO / BANK">NOSTRO / BANK</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Amount ($)</Label>
-                                <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="col-span-3" placeholder="0.00" />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button onClick={handleSubmit}>Save Repayment</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" /> Record Repayment</Button>
             </div>
+
+            <RepaymentDialog
+                open={isCreateDialogOpen}
+                onOpenChange={setIsCreateDialogOpen}
+                loans={loans}
+                onSuccess={loadData}
+            />
+
+            <RepaymentDialog
+                open={isEditDialogOpen}
+                onOpenChange={setIsEditDialogOpen}
+                loans={loans}
+                initialData={editingRepayment}
+                onSuccess={() => {
+                    setEditingRepayment(null);
+                    loadData();
+                }}
+            />
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
@@ -268,12 +235,13 @@ export default function RepaymentsPage() {
                                 <TableHead>Financier</TableHead>
                                 <TableHead>Method</TableHead>
                                 <TableHead className="text-right">Amount ($)</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filteredRepayments.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                         No repayments found matching filters.
                                     </TableCell>
                                 </TableRow>
@@ -297,6 +265,29 @@ export default function RepaymentsPage() {
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-bold">
                                             {r.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </TableCell>
+                                        <TableCell>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleEdit(r)}
+                                                    >
+                                                        <Edit className="mr-2 h-4 w-4" /> Edit
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        className="text-destructive focus:text-destructive"
+                                                        onClick={() => handleDelete(r.id)}
+                                                    >
+                                                        <Trash className="mr-2 h-4 w-4" /> Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))

@@ -51,30 +51,88 @@ const formSchema = z.object({
 
     dealOwner: z.string().optional(),
     comments: z.string().optional(),
+}).refine((data) => {
+    if (data.disbursementDate && data.date > data.disbursementDate) {
+        return false;
+    }
+    return true;
+}, {
+    message: "Disbursement date cannot be earlier than Deal date",
+    path: ["disbursementDate"],
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function DealForm({ masterData }: { masterData: any }) {
-    const router = useRouter();
+interface DealFormProps {
+    masterData: any;
+    initialData?: any;
+    onSubmit: (data: FormValues) => Promise<void>;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}
+
+export function DealForm({ masterData, initialData, onSubmit, open, onOpenChange }: DealFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            id: "",
-            date: new Date(),
-            status: "Open",
-            commodityId: "",
-            supplierId: "",
-            customerId: "",
-            quantity: 0,
-            supplierPricePerTon: 0,
-            offtakePricePerTon: 0,
-            paymentTermsFinancier: 30, // Default to 30 days
+            id: initialData?.id || "",
+            date: initialData?.date ? new Date(initialData.date) : new Date(),
+            status: initialData?.status || "Open",
+            commodityId: initialData?.commodityId || "",
+            commodityGrade: initialData?.commodityGrade || "",
+            supplierId: initialData?.supplierId || "",
+            customerId: initialData?.customerId || "",
+            financierId: initialData?.financierId || "none",
+            quantity: initialData ? Number(initialData.quantity) : 0,
+            supplierPricePerTon: initialData ? Number(initialData.supplierPricePerTon) : 0,
+            offtakePricePerTon: initialData ? Number(initialData.offtakePricePerTon) : 0,
+            paymentTermsCustomer: initialData?.paymentTermsCustomer || 0,
+            paymentTermsFinancier: initialData?.paymentTermsFinancier || 30,
+            disbursementDate: initialData?.loan?.disbursementDate ? new Date(initialData.loan.disbursementDate) : undefined,
+            dealOwner: initialData?.dealOwner || "",
+            comments: initialData?.comments || "",
         },
     });
+
+    useEffect(() => {
+        if (initialData) {
+            form.reset({
+                id: initialData.id,
+                date: new Date(initialData.date),
+                status: initialData.status,
+                commodityId: initialData.commodityId,
+                commodityGrade: initialData.commodityGrade || "",
+                supplierId: initialData.supplierId,
+                customerId: initialData.customerId,
+                financierId: initialData.financierId || "none",
+                quantity: Number(initialData.quantity),
+                supplierPricePerTon: Number(initialData.supplierPricePerTon),
+                offtakePricePerTon: Number(initialData.offtakePricePerTon),
+                paymentTermsCustomer: initialData.paymentTermsCustomer,
+                paymentTermsFinancier: initialData.paymentTermsFinancier,
+                disbursementDate: initialData.loan?.disbursementDate ? new Date(initialData.loan.disbursementDate) : undefined,
+                dealOwner: initialData.dealOwner || "",
+                comments: initialData.comments || "",
+            });
+        } else {
+            form.reset({
+                id: "",
+                date: new Date(),
+                status: "Open",
+                commodityId: "",
+                supplierId: "",
+                customerId: "",
+                quantity: 0,
+                supplierPricePerTon: 0,
+                offtakePricePerTon: 0,
+                paymentTermsFinancier: 30,
+                financierId: "none"
+            });
+        }
+    }, [initialData, form]);
 
     const { watch, setValue } = form;
     const quantity = watch("quantity");
@@ -89,37 +147,27 @@ export function DealForm({ masterData }: { masterData: any }) {
     const grossMargin = salesValue - costValue;
     const marginPercent = salesValue > 0 ? (grossMargin / salesValue) * 100 : 0;
 
-    // Calculate Maturity Date
     let maturityDateDisplay = "N/A";
     if (disbursementDate && paymentTermsFinancier) {
         const mDate = addDays(disbursementDate, paymentTermsFinancier);
         maturityDateDisplay = format(mDate, "MMM d, yyyy");
     }
 
-    // Auto-set Maturity Value to Cost Value (Principal) initially if not set
     useEffect(() => {
-        if (costValue > 0) {
-            // Optional: You could auto-fill this, but user might want to edit it (e.g. adding interest)
-            // Keeping it manual or user can see the logic
-        }
-    }, [costValue]);
+        const calculatedMaturity = (quantity || 0) * (supplierPrice || 0);
+        setValue("maturityValue", calculatedMaturity);
+    }, [quantity, supplierPrice, setValue]);
 
-    async function onSubmit(values: FormValues) {
+    async function handleFormSubmit(values: FormValues) {
         setIsSubmitting(true);
         setServerError(null);
-
-        const result = await createDeal({
-            ...values,
-            financierId: values.financierId === "none" ? undefined : values.financierId,
-        });
-
-        if (result.success) {
-            router.push("/deals");
-            router.refresh(); // Refresh server components
-        } else {
-            setServerError(result.error || "Something went wrong");
+        try {
+            await onSubmit(values);
+        } catch (e: any) {
+            setServerError(e.message || "An error occurred");
+        } finally {
+            setIsSubmitting(false);
         }
-        setIsSubmitting(false);
     }
 
     const hasFinancier = financierId && financierId !== "none";
@@ -394,9 +442,14 @@ export function DealForm({ masterData }: { masterData: any }) {
                                                 <FormItem>
                                                     <FormLabel>Maturity Value ($)</FormLabel>
                                                     <FormControl>
-                                                        <Input type="number" step="0.01" placeholder={costValue.toFixed(2)} {...field} />
+                                                        <Input
+                                                            type="number"
+                                                            {...field}
+                                                            readOnly
+                                                            className="bg-muted font-semibold text-foreground"
+                                                        />
                                                     </FormControl>
-                                                    <FormDescription>Defaults to Principal amount</FormDescription>
+                                                    <FormDescription>Formula: Supplier Price * Tonnage</FormDescription>
                                                     <FormMessage />
                                                 </FormItem>
                                             )}

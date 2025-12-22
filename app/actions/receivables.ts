@@ -2,7 +2,104 @@
 
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+import { db as prisma } from "@/lib/db";
+
+import { revalidatePath } from "next/cache";
+
+export type CreateDeliveryInput = {
+    dealId: string;
+    date: Date;
+    quantity: number;
+    invoiceNumber: string;
+};
+
+// Helper to retry database operations
+async function withRetry<T>(operation: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+    try {
+        return await operation();
+    } catch (error) {
+        if (retries > 0) {
+            console.warn(`Database operation failed, retrying... (${retries} attempts left). Error: ${error}`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return withRetry(operation, retries - 1, delay * 2);
+        }
+        throw error;
+    }
+}
+
+export async function recordDelivery(input: CreateDeliveryInput) {
+    console.log("Attempting to record delivery with input:", input);
+    try {
+        await withRetry(async () => {
+            const deal = await prisma.deal.findUnique({
+                where: { id: input.dealId }
+            });
+
+            if (!deal) {
+                console.error(`Deal not found: ${input.dealId}`);
+                throw new Error("Deal not found");
+            }
+
+            // Enforce 1 Deal = 1 Delivery
+            const existingDelivery = await prisma.delivery.findFirst({
+                where: { dealId: input.dealId }
+            });
+            if (existingDelivery) {
+                throw new Error(`Delivery already exists for Deal ${input.dealId}`);
+            }
+
+            const invoiceAmount = Number(deal.offtakePricePerTon) * input.quantity;
+            console.log(`Calculated invoice amount: ${invoiceAmount} for deal ${deal.id} with price ${deal.offtakePricePerTon}`);
+
+            const delivery = await prisma.delivery.create({
+                data: {
+                    dealId: input.dealId,
+                    date: input.date,
+                    quantity: input.quantity,
+                    invoiceNumber: input.invoiceNumber,
+                    invoiceAmount: invoiceAmount,
+                    status: "Unpaid"
+                }
+            });
+            console.log("Delivery created:", delivery);
+        });
+
+        revalidatePath("/receivables");
+        revalidatePath("/customer-payments");
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to record delivery after retries. Error details:", error);
+        return { success: false, error: error.message || "Failed to record delivery" };
+    }
+}
+
+export async function getDealsForDelivery() {
+    const deals = await prisma.deal.findMany({
+        where: { status: "Open" },
+        include: {
+            customer: true,
+            commodity: true,
+            deliveries: true // Include deliveries to calculate remaining qty
+        },
+        orderBy: { date: 'desc' }
+    });
+
+    // Filter deals that are already delivered
+    // User Requirement: "Deal note is very unique ID there can not be more than one transaction"
+    // Interpretation: One Deal = One Delivery.
+    const outstandingDeals = deals.filter(deal => {
+        // If there is ANY delivery, this deal is "done" from a delivery recording perspective
+        return deal.deliveries.length === 0;
+    });
+
+    return outstandingDeals.map(d => ({
+        id: d.id,
+        customerName: d.customer.name,
+        commodityName: d.commodity.name,
+        offtakePrice: Number(d.offtakePricePerTon),
+        remainingQty: Number(d.quantity)
+    }));
+}
 
 export async function getReceivablesData() {
     // Fetch all deals and their related deliveries/payments
@@ -104,4 +201,44 @@ export async function getReceivablesData() {
     }
 
     return rows;
+}
+
+export async function deleteDelivery(id: string) {
+    try {
+        await prisma.customerPayment.deleteMany({ where: { deliveryId: id } });
+        await prisma.delivery.delete({ where: { id } });
+
+        revalidatePath("/receivables");
+        revalidatePath("/customer-payments");
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to delete delivery:", error);
+        return { success: false, error: error.message || "Failed to delete delivery" };
+    }
+}
+
+export async function updateDelivery(id: string, data: { date: Date; quantity: number; invoiceNumber: string }) {
+    try {
+        const delivery = await prisma.delivery.findUnique({ where: { id }, include: { deal: true } });
+        if (!delivery) return { success: false, error: "Delivery not found" };
+
+        const invoiceAmount = Number(delivery.deal.offtakePricePerTon) * data.quantity;
+
+        await prisma.delivery.update({
+            where: { id },
+            data: {
+                date: data.date,
+                quantity: data.quantity,
+                invoiceNumber: data.invoiceNumber,
+                invoiceAmount
+            }
+        });
+
+        revalidatePath("/receivables");
+        revalidatePath("/customer-payments");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to update delivery:", error);
+        return { success: false, error: "Failed to update delivery" };
+    }
 }

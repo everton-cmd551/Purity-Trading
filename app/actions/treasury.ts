@@ -2,7 +2,7 @@
 
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+import { db as prisma } from "@/lib/db";
 
 export async function getCashBook() {
     return await prisma.cashBook.findMany({
