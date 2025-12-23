@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { recordDelivery, updateDelivery } from "@/app/actions/receivables";
+import { recordDelivery, updateDelivery } from "@/app/(main)/actions/receivables";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -72,7 +72,6 @@ export function DeliveryDialog({ deals, initialData, open: controlledOpen, onOpe
         let result;
         if (initialData) {
             result = await updateDelivery(initialData.id, {
-                dealId: selectedDealId,
                 date: new Date(date),
                 quantity: parseFloat(quantity),
                 invoiceNumber: invoiceNumber

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getReportsData, ReportsData } from "@/app/actions/reports";
+import { getReportsData, ReportsData } from "@/app/(main)/actions/reports";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DollarSign, Package, TrendingUp, CreditCard, Activity, ArrowUpRight, ArrowDownRight } from "lucide-react";

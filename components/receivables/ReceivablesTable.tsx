@@ -14,7 +14,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { deleteDelivery } from "@/app/actions/receivables";
+import { deleteDelivery } from "@/app/(main)/actions/receivables";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { DeliveryDialog, DealOption } from "./DeliveryDialog";

@@ -23,7 +23,7 @@ import {
     createSupplier,
     createCustomer,
     createFinancier,
-} from "@/app/actions/master-data";
+} from "@/app/(main)/actions/master-data";
 import { toast } from "sonner"; // Assuming sonner is used, or I'll check for headers. Actually, I'll use standard alert or console if toast isn't obvious, but 'sonner' is common. I'll just use console.log/alert first or try to find a toast hook.
 // Wait, I didn't check for toast. I'll stick to simple alerts or just log for now to avoid breakages, or better check for a hook.
 // Let's assume no toast for now to be safe, or just use browser alert?

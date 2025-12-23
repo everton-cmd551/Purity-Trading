@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { createCustomerPayment, updateCustomerPayment } from "@/app/actions/customer-payments";
+import { createCustomerPayment, updateCustomerPayment } from "@/app/(main)/actions/customer-payments";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";

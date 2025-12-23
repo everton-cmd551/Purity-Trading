@@ -1,4 +1,4 @@
-import { getReceivablesData, getDealsForDelivery } from "@/app/actions/receivables";
+import { getReceivablesData, getDealsForDelivery } from "@/app/(main)/actions/receivables";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReceivablesTable } from "@/components/receivables/ReceivablesTable";
 

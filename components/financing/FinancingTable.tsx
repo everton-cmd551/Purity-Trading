@@ -13,7 +13,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { deleteLoan } from "@/app/actions/financing";
+import { deleteLoan } from "@/app/(main)/actions/financing";
 import { LoanDialog } from "@/components/financing/LoanDialog";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";

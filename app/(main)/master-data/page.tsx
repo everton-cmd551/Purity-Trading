@@ -1,4 +1,4 @@
-import { getMasterDataOptions } from "@/app/actions/deal";
+import { getMasterDataOptions } from "@/app/(main)/actions/deal";
 import { MasterDataTabs } from "./MasterDataTabs";
 
 export default async function MasterDataPage() {

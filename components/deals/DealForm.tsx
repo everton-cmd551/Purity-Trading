@@ -22,7 +22,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
-import { createDeal } from "@/app/actions/deal";
+import { createDeal } from "@/app/(main)/actions/deal";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";

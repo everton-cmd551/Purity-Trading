@@ -1,4 +1,4 @@
-import { getFinancingRegister } from "@/app/actions/financing";
+import { getFinancingRegister } from "@/app/(main)/actions/financing";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FinancingTable } from "@/components/financing/FinancingTable";
 

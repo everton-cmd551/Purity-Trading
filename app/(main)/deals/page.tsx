@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getDeals, getMasterDataOptions, createDeal, deleteDeal, updateDeal } from "@/app/actions/deal";
+import { getDeals, getMasterDataOptions, createDeal, deleteDeal, updateDeal } from "@/app/(main)/actions/deal";
 import { Button } from "@/components/ui/button";
 import { Plus, MoreHorizontal, Trash, Edit } from "lucide-react";
 import { DealForm } from "@/components/deals/DealForm";
@@ -132,7 +132,7 @@ export default function DealsPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Ref ID</TableHead>
+                                <TableHead>Deal Note</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Customer</TableHead>
                                 <TableHead>Commodity</TableHead>
